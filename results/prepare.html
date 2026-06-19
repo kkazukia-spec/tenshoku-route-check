@@ -29,6 +29,7 @@
     .prepare-checklist-btn:hover { background: var(--color-blue); color: #fff; opacity: 1; }
     #checklist-section { scroll-margin-top: 20px; }
   </style>
+  <link rel="canonical" href="https://kkazukia-spec.github.io/tenshoku-route-check/results/prepare.html">
 </head>
 <body>
 <!-- data-no-affiliate: PREPAREでは affiliate_cta_click を発火させない -->
@@ -125,7 +126,7 @@
   // PREPAREでは affiliate_cta_click を発火させない（data-no-affiliate で制御済み）
   document.getElementById('btn-share').addEventListener('click', function (e) {
     e.preventDefault();
-    var shareUrl = new URL('../index.html', window.location.href).href;
+    var shareUrl = 'https://kkazukia-spec.github.io/tenshoku-route-check/';
     var text = encodeURIComponent('私は「まずは準備・情報整理型」でした！\n今は転職先を探すより、自分の希望を整理するタイミング。\n#30秒転職ルート診断');
     window.open('https://twitter.com/intent/tweet?text=' + text + '&url=' + encodeURIComponent(shareUrl), '_blank', 'noopener');
     if (typeof window.trackEvent === 'function') window.trackEvent('share_click', { result_type: 'PREPARE' });

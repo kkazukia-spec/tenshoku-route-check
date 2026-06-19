@@ -8,6 +8,7 @@
   <link rel="icon" href="../assets/images/favicon.png" type="image/png">
   <link rel="stylesheet" href="../style.css">
   <script src="../assets/js/analytics.js" defer></script>
+  <link rel="canonical" href="https://kkazukia-spec.github.io/tenshoku-route-check/results/it.html">
 </head>
 <body>
 <div class="result-page" data-result-type="IT">
@@ -104,7 +105,7 @@
 <script>
   document.getElementById('btn-share').addEventListener('click', function (e) {
     e.preventDefault();
-    var shareUrl = new URL('../index.html', window.location.href).href;
+    var shareUrl = 'https://kkazukia-spec.github.io/tenshoku-route-check/';
     var text = encodeURIComponent('私は「ITキャリア挑戦型」でした！\nIT・Webへの興味を、具体的なルートに変えたいタイプ。\n#30秒転職ルート診断');
     window.open('https://twitter.com/intent/tweet?text=' + text + '&url=' + encodeURIComponent(shareUrl), '_blank', 'noopener');
     if (typeof window.trackEvent === 'function') window.trackEvent('share_click', { result_type: 'IT' });

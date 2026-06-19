@@ -147,3 +147,21 @@ const ANALYTICS_CONFIG = {
 ```
 
 `measurementId` が空の場合はGA4スクリプトを読み込みません。送信するイベントには回答内容・個人情報は含まれません。
+
+
+## 公開URL
+
+https://kkazukia-spec.github.io/tenshoku-route-check/
+
+GitHub Pages 公開元：
+
+- Branch: `main`
+- Folder: `/(root)`
+
+公開URLを変更した場合は、以下を更新してください。
+
+- canonical
+- og:url
+- og:image
+- twitter:image
+- X共有URL
