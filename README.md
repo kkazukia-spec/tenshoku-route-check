@@ -1,121 +1,149 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>プライバシーポリシー｜30秒転職ルート診断</title>
-  <link rel="icon" href="assets/images/favicon.png" type="image/png">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div class="legal-page">
-  <header class="site-header">
-    <div class="container">
-      <a href="index.html" class="site-header__logo">30秒転職ルート診断</a>
-    </div>
-  </header>
+# 30秒転職ルート診断
 
-  <main class="legal-body">
-    <h1>プライバシーポリシー</h1>
-    <p class="legal-date">制定日：2026年6月19日　最終改定日：2026年6月19日</p>
+## サイトの概要
 
-    <div class="legal-section">
-      <h2>1. 診断機能における情報の取り扱い</h2>
-      <p>本サイトの診断機能では、氏名、メールアドレス、電話番号、勤務先などの個人情報の入力を求めません。</p>
-      <p>診断回答は閲覧中のブラウザ内メモリでのみ処理され、外部サーバーへ送信されません。ページを離れると診断回答は保持されません。</p>
-      <p>流入元の確認のため、UTM情報のみsessionStorageへ一時的に保存する場合があります。</p>
-    </div>
+7つの質問に回答することで、利用者の状況や希望に合いそうな転職ルートの一例を提示する静的診断ツールです。
 
-    <div class="legal-section">
-      <h2>2. お問い合わせフォームで取得する情報</h2>
-      <p>本サイトでは、お問い合わせへの対応のため、Googleフォームを利用しています。</p>
-      <p>お問い合わせフォームでは、次の情報を取得します。</p>
-      <ul>
-        <li>お名前（任意）</li>
-        <li>メールアドレス</li>
-        <li>お問い合わせ種別</li>
-        <li>お問い合わせ内容</li>
-      </ul>
-      <p>入力された情報は、お問い合わせ内容の確認および必要な連絡のためにのみ使用します。</p>
-      <p>履歴書、職務経歴書、住所、電話番号、勤務先など、問い合わせ対応に不要な個人情報は入力しないでください。</p>
-    </div>
+- 診断機能では個人情報の入力を求めません（氏名・メールアドレス・電話番号・勤務先など）
+- 回答内容は外部サーバーへ送信されません（ブラウザ内メモリでのみ処理）
+- 結果は5種類の紹介サービス系タイプ＋1種類の準備・情報整理タイプの全6種類
+- 診断結果を表示しただけで広告主サイトへ自動的に移動することはありません
+- 利用者がA8.netの正式な広告リンクをクリックした場合のみ、外部サイトへ移動します
 
-    <div class="legal-section">
-      <h2>3. Googleフォームの利用について</h2>
-      <p>お問い合わせフォームはGoogleが提供するGoogleフォームを使用しています。</p>
-      <p>フォームへ入力された情報は、Googleのサービスを通じて処理・保存されます。Googleによる情報の取り扱いについては、<a href="https://policies.google.com/privacy?hl=ja" target="_blank" rel="noopener noreferrer">Googleのプライバシーポリシー</a>をご確認ください。</p>
-    </div>
+---
 
-    <div class="legal-section">
-      <h2>4. 利用目的</h2>
-      <p>お問い合わせフォームで取得した情報は、以下の目的に使用します。</p>
-      <ul>
-        <li>お問い合わせ内容の確認</li>
-        <li>お問い合わせへの回答</li>
-        <li>掲載情報の修正または削除への対応</li>
-        <li>広告やサイト運営に関する連絡</li>
-        <li>不正利用や迷惑行為への対応</li>
-      </ul>
-      <p>上記以外の目的では使用しません。</p>
-    </div>
+## 問い合わせフォームについて
 
-    <div class="legal-section">
-      <h2>5. 情報の保管と削除</h2>
-      <p>お問い合わせに関する情報は、対応に必要な期間保管します。保管の必要がなくなった情報は、合理的な範囲で適切に削除します。</p>
-    </div>
+本サイトの問い合わせ対応にはGoogleフォームを利用しています。
 
-    <div class="legal-section">
-      <h2>6. アクセス解析について</h2>
-      <p>本サイトでは、利用状況を把握するため、Google Analytics 4（導入する場合）を利用する場合があります。アクセス解析を有効にしていない期間は、当該サービスへのアクセス情報の送信は行いません。</p>
-      <p>有効化した場合に収集する情報は以下のとおりです。</p>
-      <ul>
-        <li>アクセス日時</li>
-        <li>ページのURL</li>
-        <li>使用デバイス・ブラウザ情報</li>
-        <li>診断の進捗・完了状況（内部ID）</li>
-        <li>流入元（UTMパラメータ）</li>
-      </ul>
-      <p>個人を特定できる情報や診断の回答内容そのものは収集しません。</p>
-    </div>
+- 問い合わせにはGoogleフォームを利用します
+- 問い合わせフォームではメールアドレス等を取得します
+- 取得した情報は問い合わせ対応にのみ使用します
+- フォームURLを変更した場合は、全ページの問い合わせリンクを更新してください
+- 診断回答と問い合わせ情報は別の取り扱いです（診断回答は外部送信せず、問い合わせ情報はフォーム経由でのみ取得します）
 
-    <div class="legal-section">
-      <h2>7. Cookieについて</h2>
-      <p>本サイトでは、アクセス解析のためにCookieを使用する場合があります。ブラウザの設定によりCookieを無効にすることができますが、一部の機能が正常に動作しない場合があります。</p>
-    </div>
+---
 
-    <div class="legal-section">
-      <h2>8. アフィリエイト広告について</h2>
-      <p>本サイトはA8.netのアフィリエイトプログラムに参加しています。紹介サービスへのリンクをクリックして外部サイトへ移動した場合、当該サービスのプライバシーポリシーが適用されます。</p>
-    </div>
+## ファイル構成
 
-    <div class="legal-section">
-      <h2>9. 第三者への情報提供</h2>
-      <p>本サイトは、収集した情報を第三者へ販売・提供しません。ただし、法令に基づく開示が必要な場合はこの限りではありません。</p>
-    </div>
+```
+diagnosis-tool/
+├── index.html              # 診断メインページ（スタート〜判定中）
+├── style.css                # 共通スタイルシート
+├── script.js                 # 診断ロジック
+├── about.html                # 運営者情報
+├── privacy.html               # プライバシーポリシー
+├── disclaimer.html            # 免責事項
+├── advertising-policy.html     # 広告掲載方針
+│
+├── results/
+│   ├── restart.html          # 結果：キャリア再スタート型
+│   ├── growth.html            # 結果：成長環境キャリアアップ型
+│   ├── organize.html          # 結果：方向性整理型
+│   ├── it.html                # 結果：ITキャリア挑戦型
+│   ├── sales.html             # 結果：営業キャリア活用型
+│   └── prepare.html           # 結果：まずは準備・情報整理型（広告なし）
+│
+└── assets/
+    ├── images/
+    │   ├── ren-guide.png      # キャラクター画像（要差し替え）
+    │   ├── ogp.png             # OGP画像（要差し替え）
+    │   └── favicon.png         # ファビコン（要差し替え）
+    │
+    └── js/
+        └── analytics.js        # アクセス解析処理
+```
 
-    <div class="legal-section">
-      <h2>10. お問い合わせ</h2>
-      <p>本ポリシーに関するお問い合わせは、<a href="https://docs.google.com/forms/d/e/1FAIpQLSc9FiE9QrxssRtH7XwaJatHyO9ElNKXP9jEjue935tfSrN-sg/viewform" target="_blank" rel="noopener noreferrer">お問い合わせフォーム</a>からご連絡ください。</p>
-    </div>
+---
 
-    <div class="legal-section">
-      <h2>11. ポリシーの変更</h2>
-      <p>本ポリシーは、法令の改正や運営方針の変更に応じて予告なく改定することがあります。改定後のポリシーは本ページに掲載した時点から効力を持ちます。</p>
-    </div>
-  </main>
+## ローカルプレビュー方法
 
-  <footer class="site-footer">
-    <div class="container">
-      <nav class="site-footer__links" aria-label="サイトリンク">
-        <a href="index.html">診断トップ</a>
-        <a href="about.html">運営者情報</a>
-        <a href="disclaimer.html">免責事項</a>
-        <a href="advertising-policy.html">広告掲載方針</a>
-        <a href="https://docs.google.com/forms/d/e/1FAIpQLSc9FiE9QrxssRtH7XwaJatHyO9ElNKXP9jEjue935tfSrN-sg/viewform" target="_blank" rel="noopener noreferrer">お問い合わせ</a>
-      </nav>
-      <p class="site-footer__copy">© れん｜20代転職の道案内</p>
-    </div>
-  </footer>
+```bash
+cd path/to/diagnosis-tool
+python3 -m http.server 8080
+```
+
+ブラウザで `http://localhost:8080` を開いて確認してください。
+
+VS Codeを使う場合は「Live Server」拡張機能でも確認できます。
+
+---
+
+## GitHub Pages公開方法
+
+1. このフォルダの内容をGitHubリポジトリにアップロードする
+2. リポジトリの Settings → Pages を開く
+3. Source を公開したいブランチ（例: main）に設定する
+4. 発行されたURLでアクセスできることを確認する
+
+公開後、`index.html` の canonical タグに実際の公開URLを設定してください（本バージョンでは未設定）。
+
+---
+
+## 画像の差し替え方法
+
+| ファイル | 推奨サイズ | 用途 |
+|---------|----------|------|
+| `assets/images/ren-guide.png` | 280×280px以上（正方形） | スタート画面のキャラクター |
+| `assets/images/ogp.png` | 1200×630px | SNSシェア時のOGP画像 |
+| `assets/images/favicon.png` | 32×32px または 64×64px | ブラウザタブのアイコン |
+
+同名のファイルで上書きするだけで反映されます。画像が存在しない場合でもレイアウトは崩れません（キャラクター画像は絵文字のフォールバック表示になります）。
+
+---
+
+## A8.net正式広告コードの差し込み場所
+
+各結果ページ（restart / growth / organize / it / sales）に、以下のコメントで囲まれた箇所が1か所あります。
+
+```html
+<!-- A8広告コード開始：運営者がコード全文を貼り付ける -->
+<div class="affiliate-slot affiliate-slot--xxxx" data-service-key="..." data-cta-position="main">
+  <p class="affiliate-placeholder">提携・広告準備中</p>
 </div>
-</body>
-</html>
+<!-- A8広告コード終了 -->
+```
+
+A8.net管理画面から取得した広告コード全文を、`<p class="affiliate-placeholder">...</p>` の部分と置き換えてください。
+
+### 広告コードを改変しないこと
+
+- 広告コードのURL部分だけを抜き出して使用しない
+- 広告コードをJavaScript文字列に分解して保存しない
+- 独自のパラメータを追加しない
+- href、img、計測タグ、属性を変更しない
+- 広告コード内のリンクを独自ボタンに置き換えない
+
+広告枠内の `<a>` 要素は `style.css` の `.affiliate-slot a` によって見た目だけがCTAボタン風に表示されます。リンク先・属性は一切変更されません。
+
+クリック計測（`affiliate_cta_click`）は、広告コード自体を変更せずに、親要素 `.affiliate-slot` のイベント委譲で行われます。
+
+### PR表記を削除しないこと
+
+各結果ページには、広告である旨を示す表記（「このページには広告・PRが含まれます。」および詳細なPR表記）が含まれています。これらは法令上必要な表示のため、削除・非表示にしないでください。
+
+`results/prepare.html` には広告枠・PR表記を設置しないでください（紹介サービスがないタイプのため）。
+
+---
+
+## 運用上の注意
+
+- 広告掲載を開始した後は、A8.net管理画面から掲載URLを提出する運用が必要です。
+- 紹介するサービスの内容や提供条件が変わった場合は、各結果ページの紹介文章を見直してください。
+- 各サービスの最新の利用条件は、遷移先の公式ページで利用者本人が確認する設計になっています。本サイト内に対象条件（年齢・地域・学歴・雇用形態など）の判定処理は含めていません。
+
+---
+
+## GA4（アクセス解析）の有効化方法
+
+`assets/js/analytics.js` 内の `ANALYTICS_CONFIG` を編集します。
+
+```javascript
+const ANALYTICS_CONFIG = {
+  enabled: true,                 // falseからtrueに変更
+  provider: 'ga4',
+  measurementId: 'G-XXXXXXXXXX', // GA4の測定IDを入力
+};
+```
+
+`measurementId` が空の場合はGA4スクリプトを読み込みません。送信するイベントには回答内容・個人情報は含まれません。

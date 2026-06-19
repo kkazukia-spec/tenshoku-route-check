@@ -1,872 +1,987 @@
-/**
- * 30秒転職ルート診断 - 診断ロジック
- *
- * 構成：
- *  1. CONFIG              - サイト全体の設定値
- *  2. RESULT_SERVICE_MAP  - 結果タイプと紹介サービスの対応（公開情報のみ）
- *  3. QUESTIONS           - 質問データ
- *  4. 内部状態変数
- *  5. 各処理関数
- *
- * ※ trackEvent は assets/js/analytics.js で window.trackEvent として定義済み
- * ※ ANALYTICS_CONFIG も analytics.js で管理（二重定義しない）
- * ※ 対象条件チェック（年齢・地域・学歴等）は実装しない。
- *    サービスの利用条件は遷移先の公式ページで利用者本人が確認する設計とする。
- */
-
-'use strict';
-
 /* =============================================
-   1. サイト設定
-   ============================================= */
-const CONFIG = {
-  siteName: '30秒転職ルート診断',
-  totalQuestions: 7,
-  animation: {
-    highlight: 250,  // 選択肢ハイライト表示時間（ms）
-    transition: 200, // 画面切り替え時間（ms）
-    loading: 500,    // 判定中画面の最低表示時間（ms）
-  },
-  resultUrls: {
-    RESTART:  'results/restart.html',
-    GROWTH:   'results/growth.html',
-    ORGANIZE: 'results/organize.html',
-    IT:       'results/it.html',
-    SALES:    'results/sales.html',
-    PREPARE:  'results/prepare.html',
-  },
-  share: {
-    baseUrl: 'https://twitter.com/intent/tweet',
-    hashtag: '30秒転職ルート診断',
-  },
-};
-
-/* =============================================
-   2. 結果タイプと紹介サービスの対応
-   公開情報のみを保持する（service_keyは内部の処理識別用）。
-   年齢・地域・学歴・雇用形態などの対象条件は保持しない。
-   サービスの最新の利用条件は、遷移先の公式ページで
-   利用者本人が確認する設計とする。
-   ============================================= */
-const RESULT_SERVICE_MAP = {
-  RESTART:  { serviceKey: 'uzuz' },
-  GROWTH:   { serviceKey: 'onecareer' },
-  ORGANIZE: { serviceKey: 'adecco' },
-  IT:       { serviceKey: 'unison_career' },
-  SALES:    { serviceKey: 'hape_agent' },
-};
-
-/* =============================================
-   3. 質問データ
-   各質問の加点ロジックは仕様書に準拠しています。
-   ============================================= */
-const QUESTIONS = [
-  // Q1
-  {
-    id: 'q1',
-    text: '今のあなたに最も近い状況は？',
-    choices: [
-      {
-        id: 'q1a',
-        label: '今の会社が社会人1〜2社目で、経験にまだ自信がない',
-        score: { RESTART: 3, ORGANIZE: 1 },
-        outsideScope: false,
-      },
-      {
-        id: 'q1b',
-        label: '社会人経験を生かして、次のキャリアへ進みたい',
-        score: { GROWTH: 2, IT: 1, SALES: 1 },
-        outsideScope: false,
-      },
-      {
-        id: 'q1c',
-        label: '離職中・既卒・短期離職など、職歴に不安がある',
-        score: { RESTART: 4, ORGANIZE: 1 },
-        outsideScope: false,
-      },
-      {
-        id: 'q1d',
-        label: '新卒就活、副業、フリーランスだけを検討している',
-        score: {},
-        outsideScope: true,
-      },
-    ],
-  },
-  // Q2
-  {
-    id: 'q2',
-    text: '今、最も興味がある方向は？',
-    choices: [
-      {
-        id: 'q2a',
-        label: 'IT・Web業界やエンジニア職',
-        score: { IT: 6 },
-        preferredRoute: 'IT',
-      },
-      {
-        id: 'q2b',
-        label: '営業職、または営業経験を生かす仕事',
-        score: { SALES: 6 },
-        preferredRoute: 'SALES',
-      },
-      {
-        id: 'q2c',
-        label: '成長企業や、キャリアアップできる環境',
-        score: { GROWTH: 5 },
-        preferredRoute: 'GROWTH',
-      },
-      {
-        id: 'q2d',
-        label: 'まだ職種や方向性を決められていない',
-        score: { ORGANIZE: 5 },
-        preferredRoute: 'ORGANIZE',
-      },
-    ],
-  },
-  // Q3
-  {
-    id: 'q3',
-    text: '転職を考えるうえで、最も大きな悩みは？',
-    choices: [
-      {
-        id: 'q3a',
-        label: '経験やスキル、職歴に自信がない',
-        score: { RESTART: 4 },
-      },
-      {
-        id: 'q3b',
-        label: '自分に向いている仕事が分からない',
-        score: { ORGANIZE: 4 },
-      },
-      {
-        id: 'q3c',
-        label: '収入・評価・成長環境を変えたい',
-        score: { GROWTH: 4 },
-      },
-      {
-        id: 'q3d',
-        label: '希望する業界や職種への進み方が分からない',
-        scoreConditional: {
-          IT:      { IT: 4 },
-          SALES:   { SALES: 4 },
-          default: { ORGANIZE: 2 },
-        },
-      },
-    ],
-  },
-  // Q4
-  {
-    id: 'q4',
-    text: 'どのようなサポートがあると動きやすい？',
-    choices: [
-      {
-        id: 'q4a',
-        label: '応募書類や面接も含め、基本から支えてほしい',
-        score: { RESTART: 3 },
-      },
-      {
-        id: 'q4b',
-        label: '希望する業界や職種に詳しい人へ相談したい',
-        scoreConditional: {
-          IT:      { IT: 4 },
-          SALES:   { SALES: 4 },
-          default: { ORGANIZE: 2 },
-        },
-      },
-      {
-        id: 'q4c',
-        label: '複数の選択肢を見ながら、方向性を整理したい',
-        score: { ORGANIZE: 3 },
-      },
-      {
-        id: 'q4d',
-        label: '成長企業やキャリアアップ求人を知りたい',
-        score: { GROWTH: 3 },
-      },
-    ],
-  },
-  // Q5
-  {
-    id: 'q5',
-    text: '次の職場で最も変えたいことは？',
-    choices: [
-      {
-        id: 'q5a',
-        label: '未経験でも挑戦できる環境やサポート',
-        score: { RESTART: 3 },
-        scoreConditionalAdd: { IT: { IT: 2 } },
-      },
-      {
-        id: 'q5b',
-        label: '専門性や手に職を身につけられること',
-        scoreConditional: {
-          IT:      { IT: 3 },
-          SALES:   { SALES: 2 },
-          default: { ORGANIZE: 1 },
-        },
-      },
-      {
-        id: 'q5c',
-        label: '年収・裁量・キャリアアップ',
-        score: { GROWTH: 3 },
-        scoreConditionalAdd: { SALES: { SALES: 1 } },
-      },
-      {
-        id: 'q5d',
-        label: '自分に合う仕事内容や働き方',
-        score: { ORGANIZE: 3 },
-      },
-    ],
-  },
-  // Q6
-  {
-    id: 'q6',
-    text: '転職活動を始める時期は？',
-    choices: [
-      { id: 'q6a', label: 'できれば1か月以内',              readiness: 3 },
-      { id: 'q6b', label: '3か月以内を目安に動きたい',       readiness: 2 },
-      { id: 'q6c', label: '半年以内に良い選択肢があれば動きたい', readiness: 1 },
-      { id: 'q6d', label: 'まだ時期は決めていない',          readiness: 0, score: { PREPARE: 2, ORGANIZE: 1 } },
-    ],
-  },
-  // Q7
-  {
-    id: 'q7',
-    text: '今の段階で、どこまでなら行動できそう？',
-    choices: [
-      { id: 'q7a', label: '無料相談を利用して具体的に整理したい',       readiness: 3 },
-      { id: 'q7b', label: 'まず無料登録して求人や選択肢を比較したい',    readiness: 2, score: { GROWTH: 1, ORGANIZE: 1 } },
-      { id: 'q7c', label: 'サービスを使う前に、もう少し情報を集めたい', readiness: 1, score: { PREPARE: 2 } },
-      { id: 'q7d', label: '今は登録や相談をするつもりはない',            readiness: 0, notReadyForService: true },
-    ],
-  },
-];
-
-/**
- * タイブレーカー用ラベルマップ
- * 上位2タイプの組み合わせに応じた選択肢ラベル
- */
-const TIEBREAKER_LABELS = {
-  RESTART:  '経験に自信がなくても始められる転職方法',
-  IT:       'IT・Web業界への具体的な進み方',
-  SALES:    '営業経験を生かせる会社やキャリア',
-  GROWTH:   '成長できる企業やキャリアアップ',
-  ORGANIZE: '職種や転職方法を一緒に整理すること',
-};
-
-/* =============================================
-   4. 内部状態変数
+   30秒転職ルート診断 - 共通スタイルシート
+   れん｜20代転職の道案内
    ============================================= */
 
-/** スコア管理 */
-let scores = { RESTART: 0, GROWTH: 0, ORGANIZE: 0, IT: 0, SALES: 0, PREPARE: 0 };
+/* CSS カスタムプロパティ（変数） */
+:root {
+  --color-bg: #F7F9FC;
+  --color-card: #FFFFFF;
+  --color-navy: #243B64;
+  --color-blue: #7FA9D8;
+  --color-blue-light: #EAF2FA;
+  --color-text: #263238;
+  --color-text-sub: #667085;
+  --color-accent: #E9925A;
+  --color-border: #D9E2EC;
+  --color-danger: #B54747;
 
-/** 転職意欲スコア */
-let readinessScore = 0;
+  --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Yu Gothic", "YuGothic",
+    "ヒラギノ角ゴ ProN", "Hiragino Kaku Gothic ProN", "メイリオ", Meiryo, sans-serif;
 
-/** Q2で選んだ希望ルート */
-let preferredRoute = null;
+  --radius-card: 16px;
+  --radius-btn: 12px;
+  --radius-sm: 8px;
 
-/** 対象外フラグ */
-let outsideScope = false;
+  --shadow-card: 0 2px 12px rgba(36, 59, 100, 0.08);
+  --shadow-btn: 0 2px 8px rgba(36, 59, 100, 0.15);
 
-/** 登録不要フラグ */
-let notReadyForService = false;
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 250ms ease;
 
-/** タイブレーカーを使用したか */
-let usedTiebreaker = false;
+  --max-width: 720px;
+  --max-width-card: 640px;
+}
 
-/** 各質問の回答ID */
-let answers = new Array(QUESTIONS.length).fill(null);
+/* リセット & ベース */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-/** 現在表示中の質問インデックス */
-let currentQuestionIndex = 0;
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
 
-/** タイブレーカーモード中か */
-let isTiebreakerMode = false;
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.7;
+  min-height: 100vh;
+  /* iPhoneのノッチ・下部バー対応 */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
 
-/** タイブレーカーの回答 */
-let tiebreakerAnswer = null;
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
 
-/**
- * 基本7問終了時に保存した上位2タイプ
- * タイブレーカーから戻る際にリセットする
- */
-let tiebreakerCandidates = null; // { first: 'RESTART', second: 'ORGANIZE' } 形式
+a {
+  color: var(--color-navy);
+  text-decoration: underline;
+}
 
-/* =============================================
-   5. 処理関数
-   ============================================= */
+a:hover {
+  opacity: 0.75;
+}
 
-/**
- * 診断ツールを初期化する
- */
-function initializeDiagnosis() {
-  saveUtmParameters();
-  showScreen('start');
-  trackEvent('diagnosis_view', {});
+/* フォーカスリング（アクセシビリティ必須） */
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
 
-  const startBtn = document.getElementById('btn-start');
-  if (startBtn) startBtn.addEventListener('click', startDiagnosis);
-
-  // キャラクター画像フォールバック
-  const charImg = document.querySelector('.start__character img');
-  if (charImg) {
-    charImg.style.color = 'transparent';
-    charImg.style.fontSize = '0';
-
-    const showFallback = () => {
-      const wrapper = charImg.closest('.start__character');
-      if (wrapper) {
-        wrapper.innerHTML = '<span class="start__character--fallback" aria-hidden="true">🗺️</span>';
-      }
-    };
-    charImg.addEventListener('error', showFallback);
-    if (charImg.complete && !charImg.naturalWidth) showFallback();
+/* モーション低減対応 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
-}
-
-/**
- * 診断を開始する
- */
-function startDiagnosis() {
-  resetDiagnosis();
-  showScreen('question');
-  currentQuestionIndex = 0;
-  showQuestion(currentQuestionIndex);
-  trackEvent('diagnosis_start', {});
-}
-
-/**
- * 指定インデックスの質問を表示する
- * @param {number} index
- */
-function showQuestion(index) {
-  const question = QUESTIONS[index];
-  if (!question) return;
-
-  const questionContainer = document.getElementById('question-container');
-  if (!questionContainer) return;
-
-  updateProgress(index + 1, CONFIG.totalQuestions);
-
-  const choicesHtml = question.choices.map((choice) => {
-    const isSelected = answers[index] === choice.id;
-    return `
-      <li>
-        <button
-          class="choice-btn${isSelected ? ' is-selected' : ''}"
-          data-choice-id="${choice.id}"
-          data-question-index="${index}"
-          aria-pressed="${isSelected}"
-          tabindex="0"
-        >${escapeHtml(choice.label)}</button>
-      </li>`;
-  }).join('');
-
-  questionContainer.innerHTML = `
-    <div class="question-card">
-      <p class="question-card__text" id="question-text-${index}">
-        ${escapeHtml(question.text)}
-      </p>
-      <ul class="choices" role="group" aria-labelledby="question-text-${index}">
-        ${choicesHtml}
-      </ul>
-    </div>
-    <nav class="question-nav" aria-label="診断ナビゲーション">
-      ${index > 0
-        ? '<button class="btn-back" id="btn-back" aria-label="前の質問に戻る">前の質問へ</button>'
-        : '<span></span>'
-      }
-      <button class="btn-reset" id="btn-reset">最初からやり直す</button>
-    </nav>`;
-
-  questionContainer.querySelectorAll('.choice-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      selectAnswer(parseInt(btn.dataset.questionIndex, 10), btn.dataset.choiceId);
-    });
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
-    });
-  });
-
-  const backBtn = document.getElementById('btn-back');
-  if (backBtn) backBtn.addEventListener('click', goBack);
-
-  const resetBtn = document.getElementById('btn-reset');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      if (confirm('最初からやり直しますか？')) {
-        resetDiagnosis();
-        showScreen('start');
-        trackEvent('retry_click', {});
-      }
-    });
-  }
-
-  // question_view：answer_id は送信しない
-  trackEvent('question_view', { question_id: question.id });
-
-  const questionText = questionContainer.querySelector('.question-card__text');
-  if (questionText) {
-    questionText.setAttribute('tabindex', '-1');
-    questionText.focus();
-  }
-}
-
-/**
- * タイブレーカー（追加質問）を表示する
- * 上位2タイプに対応する選択肢だけを表示する
- * @param {{ first: string, second: string }} candidates - 上位2タイプ
- */
-function showTiebreaker(candidates) {
-  const questionContainer = document.getElementById('question-container');
-  if (!questionContainer) return;
-
-  isTiebreakerMode = true;
-  usedTiebreaker = true;
-  tiebreakerCandidates = candidates;
-
-  updateProgress(CONFIG.totalQuestions, CONFIG.totalQuestions);
-
-  // 上位2タイプの選択肢だけを生成
-  const tbChoices = [candidates.first, candidates.second].map(type => ({
-    id: 'tb_' + type.toLowerCase(),
-    type: type,
-    label: TIEBREAKER_LABELS[type] || type,
-  }));
-
-  const choicesHtml = tbChoices.map(choice => `
-    <li>
-      <button
-        class="choice-btn"
-        data-choice-id="${choice.id}"
-        data-choice-type="${choice.type}"
-        aria-pressed="false"
-        tabindex="0"
-      >${escapeHtml(choice.label)}</button>
-    </li>`).join('');
-
-  questionContainer.innerHTML = `
-    <div class="question-card">
-      <p class="question-card__text" id="question-text-tb">
-        今のあなたが、最も相談したいことは？
-      </p>
-      <ul class="choices" role="group" aria-labelledby="question-text-tb">
-        ${choicesHtml}
-      </ul>
-    </div>
-    <nav class="question-nav" aria-label="診断ナビゲーション">
-      <button class="btn-back" id="btn-back-tb" aria-label="前の質問に戻る">前の質問へ</button>
-      <button class="btn-reset" id="btn-reset-tb">最初からやり直す</button>
-    </nav>`;
-
-  questionContainer.querySelectorAll('.choice-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      selectTiebreakerAnswer(btn.dataset.choiceId, btn.dataset.choiceType);
-    });
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
-    });
-  });
-
-  // 戻るボタン：タイブレーカー関連状態をリセット
-  const backBtn = document.getElementById('btn-back-tb');
-  if (backBtn) {
-    backBtn.addEventListener('click', () => {
-      usedTiebreaker = false;
-      tiebreakerAnswer = null;
-      isTiebreakerMode = false;
-      tiebreakerCandidates = null;
-      currentQuestionIndex = QUESTIONS.length - 1;
-      showQuestion(currentQuestionIndex);
-      trackEvent('diagnosis_back', { question_id: 'tb' });
-    });
-  }
-
-  const resetBtn = document.getElementById('btn-reset-tb');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      if (confirm('最初からやり直しますか？')) {
-        resetDiagnosis();
-        showScreen('start');
-        trackEvent('retry_click', {});
-      }
-    });
-  }
-
-  trackEvent('question_view', { question_id: 'tb' });
-}
-
-/**
- * 回答を選択する（基本7問用）
- * @param {number} questionIndex
- * @param {string} choiceId
- */
-function selectAnswer(questionIndex, choiceId) {
-  const question = QUESTIONS[questionIndex];
-  if (!question) return;
-  const choice = question.choices.find(c => c.id === choiceId);
-  if (!choice) return;
-
-  // ハイライト表示
-  document.querySelectorAll('.choice-btn').forEach(btn => {
-    btn.classList.remove('is-selected');
-    btn.setAttribute('aria-pressed', 'false');
-  });
-  const selectedBtn = document.querySelector(`[data-choice-id="${choiceId}"]`);
-  if (selectedBtn) {
-    selectedBtn.classList.add('is-selected');
-    selectedBtn.setAttribute('aria-pressed', 'true');
-  }
-
-  answers[questionIndex] = choiceId;
-
-  // フラグ処理
-  if (choice.outsideScope) outsideScope = true;
-  if (choice.notReadyForService) notReadyForService = true;
-  if (choice.preferredRoute !== undefined) preferredRoute = choice.preferredRoute;
-
-  // question_answer：question_id のみ送信（answer_idなどの回答内容は送信しない）
-  trackEvent('question_answer', { question_id: question.id });
-
-  setTimeout(() => {
-    if (questionIndex + 1 < QUESTIONS.length) {
-      currentQuestionIndex = questionIndex + 1;
-      showQuestion(currentQuestionIndex);
-    } else {
-      runDiagnosis();
-    }
-  }, CONFIG.animation.highlight);
-}
-
-/**
- * タイブレーカーの回答を選択する
- * 選んだタイプを直接最終結果にする
- * @param {string} choiceId
- * @param {string} choiceType - 'RESTART' | 'IT' | 'SALES' | 'GROWTH' | 'ORGANIZE'
- */
-function selectTiebreakerAnswer(choiceId, choiceType) {
-  const selectedBtn = document.querySelector(`[data-choice-id="${choiceId}"]`);
-  if (selectedBtn) {
-    selectedBtn.classList.add('is-selected');
-    selectedBtn.setAttribute('aria-pressed', 'true');
-  }
-
-  tiebreakerAnswer = choiceType;
-  trackEvent('question_answer', { question_id: 'tb' });
-
-  setTimeout(() => { runDiagnosis(); }, CONFIG.animation.highlight);
-}
-
-/**
- * 前の質問へ戻る
- */
-function goBack() {
-  trackEvent('diagnosis_back', { question_id: QUESTIONS[currentQuestionIndex].id });
-  currentQuestionIndex = Math.max(0, currentQuestionIndex - 1);
-  showQuestion(currentQuestionIndex);
-}
-
-/**
- * 過去の回答状態を復元する（showQuestion内で対応済み・拡張用）
- * @param {number} questionIndex
- */
-function restoreAnswerState(questionIndex) {
-  const savedAnswer = answers[questionIndex];
-  if (!savedAnswer) return;
-  const btn = document.querySelector(`[data-choice-id="${savedAnswer}"]`);
-  if (btn) {
-    btn.classList.add('is-selected');
-    btn.setAttribute('aria-pressed', 'true');
-  }
-}
-
-/**
- * スコアを全回答から再計算する
- */
-function calculateScores() {
-  scores = { RESTART: 0, GROWTH: 0, ORGANIZE: 0, IT: 0, SALES: 0, PREPARE: 0 };
-  readinessScore = 0;
-  preferredRoute = null;
-  outsideScope = false;
-  notReadyForService = false;
-
-  answers.forEach((choiceId, qIndex) => {
-    if (choiceId === null) return;
-    const question = QUESTIONS[qIndex];
-    const choice = question.choices.find(c => c.id === choiceId);
-    if (!choice) return;
-
-    if (choice.outsideScope) outsideScope = true;
-    if (choice.notReadyForService) notReadyForService = true;
-    if (choice.preferredRoute !== undefined) preferredRoute = choice.preferredRoute;
-    if (choice.readiness !== undefined) readinessScore += choice.readiness;
-
-    if (choice.score) {
-      Object.entries(choice.score).forEach(([type, point]) => {
-        scores[type] = (scores[type] || 0) + point;
-      });
-    }
-
-    if (choice.scoreConditional) {
-      const conditional = choice.scoreConditional[preferredRoute] || choice.scoreConditional.default;
-      if (conditional) {
-        Object.entries(conditional).forEach(([type, point]) => {
-          scores[type] = (scores[type] || 0) + point;
-        });
-      }
-    }
-
-    if (choice.scoreConditionalAdd) {
-      const addScore = choice.scoreConditionalAdd[preferredRoute];
-      if (addScore) {
-        Object.entries(addScore).forEach(([type, point]) => {
-          scores[type] = (scores[type] || 0) + point;
-        });
-      }
-    }
-  });
-}
-
-/**
- * PREPAREを表示すべきか判定する
- * @returns {boolean}
- */
-function checkPrepareResult() {
-  if (outsideScope) return true;
-  if (notReadyForService) return true;
-  if (readinessScore <= 1) return true;
-
-  const eligibleTypes = ['RESTART', 'GROWTH', 'ORGANIZE', 'IT', 'SALES'];
-  const hasEligible = eligibleTypes.some(type => checkEligibility(type));
-  if (!hasEligible) return true;
-
-  return false;
-}
-
-/**
- * 指定タイプに紹介サービスが存在するか確認する
- * 年齢・地域・学歴・雇用形態などの対象条件チェックは行わない。
- * サービスの利用条件は遷移先の公式ページで利用者本人が確認する。
- * @param {string} type
- * @returns {boolean}
- */
-function checkEligibility(type) {
-  return Object.prototype.hasOwnProperty.call(RESULT_SERVICE_MAP, type);
-}
-
-/**
- * スコアを降順にランキングした配列を返す
- * @returns {Array<{type: string, score: number}>}
- */
-function getRankedResults() {
-  const targetTypes = ['RESTART', 'GROWTH', 'ORGANIZE', 'IT', 'SALES'];
-  return targetTypes
-    .filter(type => checkEligibility(type))
-    .map(type => ({ type, score: scores[type] }))
-    .sort((a, b) => b.score - a.score);
-}
-
-/**
- * タイブレーカーが必要か判定する
- * @param {Array} ranked
- * @returns {boolean}
- */
-function needsTiebreaker(ranked) {
-  if (ranked.length < 2) return false;
-  return Math.abs(ranked[0].score - ranked[1].score) <= 1;
-}
-
-/**
- * タイブレーカー結果から最終タイプを確定する
- * 選択タイプを優先し、紹介サービスがなければ対方、両方なければPREPARE
- * @returns {string}
- */
-function determineTiebreakerResult() {
-  if (!tiebreakerAnswer || !tiebreakerCandidates) return 'PREPARE';
-
-  const selected = tiebreakerAnswer;
-  const other = (selected === tiebreakerCandidates.first)
-    ? tiebreakerCandidates.second
-    : tiebreakerCandidates.first;
-
-  if (checkEligibility(selected)) return selected;
-  if (checkEligibility(other)) return other;
-  return 'PREPARE';
-}
-
-/**
- * 最終結果タイプを確定する
- * @returns {string} 結果タイプID、または '__TIEBREAKER__'
- */
-function determineFinalResult() {
-  calculateScores();
-
-  if (checkPrepareResult()) return 'PREPARE';
-
-  // タイブレーカー済みの場合は選択タイプを優先
-  if (usedTiebreaker && tiebreakerAnswer) {
-    return determineTiebreakerResult();
-  }
-
-  const ranked = getRankedResults();
-  if (ranked.length === 0) return 'PREPARE';
-
-  if (!needsTiebreaker(ranked)) return ranked[0].type;
-
-  // タイブレーカーが必要 → 上位2タイプを保存して返す
-  return '__TIEBREAKER__';
-}
-
-/**
- * 診断を実行し、結果へ遷移する
- * 重要: determineFinalResult() 内で calculateScores() が走るため、
- *       ランキングは必ずその後に取得する
- */
-function runDiagnosis() {
-  // 1〜3. スコア計算 → PREPARE判定 → タイブレーカー済みなら最終確定
-  let result = determineFinalResult();
-
-  if (result === '__TIEBREAKER__') {
-    // 4. 最新スコアからランキングを取得（calculateScores後）
-    const ranked = getRankedResults();
-    // 5. 最新ランキングの上位2タイプだけを追加質問に表示
-    showTiebreaker({
-      first: ranked[0].type,
-      second: ranked[1].type,
-    });
-    return;
-  }
-
-  showScreen('loading');
-  setTimeout(() => {
-    const utmData = getUtmParameters();
-    trackEvent('diagnosis_complete', {
-      result_type: result,
-      question_count: usedTiebreaker ? CONFIG.totalQuestions + 1 : CONFIG.totalQuestions,
-      used_tiebreaker: usedTiebreaker,
-      utm_source: utmData.utm_source || '',
-      utm_medium: utmData.utm_medium || '',
-      utm_campaign: utmData.utm_campaign || '',
-    });
-    redirectToResult(result);
-  }, CONFIG.animation.loading);
-}
-
-/**
- * UTMパラメータをsessionStorageへ保存する
- */
-function saveUtmParameters() {
-  const params = new URLSearchParams(window.location.search);
-  ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(key => {
-    const value = params.get(key);
-    if (value) sessionStorage.setItem(key, value);
-  });
-}
-
-/**
- * sessionStorageからUTMパラメータを取得する
- * @returns {Object}
- */
-function getUtmParameters() {
-  const result = {};
-  ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(key => {
-    const value = sessionStorage.getItem(key);
-    if (value) result[key] = value;
-  });
-  return result;
-}
-
-/**
- * 診断状態をすべてリセットする
- */
-function resetDiagnosis() {
-  scores = { RESTART: 0, GROWTH: 0, ORGANIZE: 0, IT: 0, SALES: 0, PREPARE: 0 };
-  readinessScore = 0;
-  preferredRoute = null;
-  outsideScope = false;
-  notReadyForService = false;
-  usedTiebreaker = false;
-  answers = new Array(QUESTIONS.length).fill(null);
-  currentQuestionIndex = 0;
-  isTiebreakerMode = false;
-  tiebreakerAnswer = null;
-  tiebreakerCandidates = null;
-}
-
-/**
- * 結果ページへ遷移する（回答内容はURLに含めない）
- * @param {string} resultType
- */
-function redirectToResult(resultType) {
-  const url = CONFIG.resultUrls[resultType];
-  if (!url) { console.error('結果URLが見つかりません:', resultType); return; }
-  window.location.href = url;
 }
 
 /* =============================================
-   ユーティリティ
+   レイアウト共通
    ============================================= */
 
-/**
- * 指定画面を表示し他を非表示にする
- * @param {string} screenName
- */
-function showScreen(screenName) {
-  ['start', 'question', 'loading'].forEach(name => {
-    const el = document.getElementById('screen-' + name);
-    if (!el) return;
-    if (name === screenName) {
-      el.style.display = '';
-      el.classList.add('is-active');
-    } else {
-      el.style.display = 'none';
-      el.classList.remove('is-active');
-    }
-  });
+.site-wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/**
- * プログレスバーと進捗テキストを更新する
- * @param {number} current
- * @param {number} total
- */
-function updateProgress(current, total) {
-  const fill = document.getElementById('progress-fill');
-  const countEl = document.getElementById('progress-count');
-  const timeEl = document.getElementById('progress-time');
-  const bar = document.querySelector('.progress-bar');
-
-  const pct = Math.round((current / total) * 100);
-
-  if (fill) fill.style.width = pct + '%';
-
-  // aria属性を更新
-  if (bar) {
-    bar.setAttribute('aria-valuenow', current);
-    bar.setAttribute('aria-valuetext', current + '問目 / 全' + total + '問');
-  }
-
-  if (countEl) countEl.textContent = current + ' / ' + total + '問';
-  if (timeEl) {
-    const remaining = Math.ceil((total - current + 1) * 4);
-    timeEl.textContent = remaining > 0 ? '残り約' + remaining + '秒' : '';
-  }
-}
-
-/**
- * XSS対策: HTMLエスケープ
- * @param {string} str
- * @returns {string}
- */
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 16px;
 }
 
 /* =============================================
-   初期化
+   サイトヘッダー（法務ページ用）
    ============================================= */
-document.addEventListener('DOMContentLoaded', initializeDiagnosis);
+
+.site-header {
+  background: var(--color-navy);
+  padding: 14px 0;
+}
+
+.site-header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-header__logo {
+  color: #fff;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* =============================================
+   サイトフッター
+   ============================================= */
+
+.site-footer {
+  margin-top: auto;
+  background: var(--color-navy);
+  color: rgba(255,255,255,0.7);
+  padding: 32px 0 24px;
+  font-size: 13px;
+}
+
+.site-footer .container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.site-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.site-footer__links a {
+  color: rgba(255,255,255,0.75);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.site-footer__links a:hover {
+  color: #fff;
+  opacity: 1;
+}
+
+.site-footer__copy {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+/* =============================================
+   診断ツール本体（index.html）
+   ============================================= */
+
+#diagnosis-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+/* ---- スタート画面 ---- */
+.screen {
+  width: 100%;
+  display: none;
+  animation: fadeIn var(--transition-slow) ease;
+}
+
+.screen.is-active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* スタート画面レイアウト */
+#screen-start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 16px 80px;
+  text-align: center;
+}
+
+.start__badge {
+  display: inline-block;
+  background: var(--color-blue-light);
+  color: var(--color-navy);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 100px;
+  margin-bottom: 20px;
+  letter-spacing: 0.03em;
+}
+
+.start__title {
+  font-size: clamp(26px, 6vw, 36px);
+  font-weight: 800;
+  color: var(--color-navy);
+  line-height: 1.25;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+
+.start__catch {
+  font-size: 16px;
+  color: var(--color-text);
+  line-height: 1.7;
+  margin-bottom: 24px;
+  white-space: pre-line;
+}
+
+.start__meta {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.start__meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-sub);
+}
+
+.start__meta-item::before {
+  content: "✓";
+  color: var(--color-blue);
+  font-weight: 700;
+}
+
+.start__character {
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-blue-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.start__character img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* キャラクター画像がない場合のフォールバック */
+.start__character--fallback {
+  font-size: 48px;
+  line-height: 1;
+}
+
+/* 画像読み込み失敗時にaltテキストを非表示にする */
+.start__character img {
+  display: block;
+  /* 画像エラー時も枠を維持 */
+}
+
+.start__character img[src="assets/images/ren-guide.png"]:not([complete]) {
+  min-height: 140px;
+}
+
+.start__btn {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  padding: 18px 24px;
+  background: var(--color-navy);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: var(--shadow-btn);
+  letter-spacing: 0.02em;
+  min-height: 56px;
+}
+
+.start__btn:hover {
+  background: #1a2d50;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(36, 59, 100, 0.25);
+}
+
+.start__btn:active {
+  transform: translateY(0);
+}
+
+.start__note {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--color-text-sub);
+  line-height: 1.6;
+}
+
+/* ---- 質問画面 ---- */
+#screen-question {
+  padding: 0 0 80px;
+}
+
+/* プログレスバー */
+.progress-bar {
+  width: 100%;
+  background: var(--color-border);
+  height: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--color-navy);
+  transition: width 300ms ease;
+  border-radius: 0 2px 2px 0;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 0;
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+.progress-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-navy);
+}
+
+.progress-time {
+  font-size: 12px;
+  color: var(--color-text-sub);
+}
+
+/* 質問カード */
+.question-card {
+  max-width: var(--max-width-card);
+  margin: 16px auto 0;
+  padding: 0 16px;
+}
+
+.question-card__text {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-navy);
+  line-height: 1.5;
+  margin-bottom: 20px;
+  letter-spacing: -0.01em;
+}
+
+/* 選択肢リスト */
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+.choice-btn {
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 18px;
+  background: var(--color-card);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-normal),
+    background var(--transition-normal),
+    transform var(--transition-fast);
+  line-height: 1.5;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-family);
+}
+
+.choice-btn::before {
+  content: "";
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.choice-btn:hover {
+  border-color: var(--color-blue);
+  background: var(--color-blue-light);
+  transform: translateX(2px);
+}
+
+/* 選択状態（ハイライト） */
+.choice-btn.is-selected {
+  border-color: var(--color-navy);
+  background: var(--color-blue-light);
+}
+
+.choice-btn.is-selected::before {
+  background: var(--color-navy);
+  border-color: var(--color-navy);
+}
+
+/* ナビゲーション（戻るボタン等） */
+.question-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: var(--max-width-card);
+  margin: 24px auto 0;
+  padding: 0 16px;
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: var(--color-text-sub);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-family);
+  min-height: 44px;
+}
+
+.btn-back:hover {
+  color: var(--color-navy);
+}
+
+.btn-back::before {
+  content: "←";
+  font-size: 16px;
+}
+
+.btn-reset {
+  background: none;
+  border: none;
+  color: var(--color-text-sub);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 8px 0;
+  font-family: var(--font-family);
+  min-height: 44px;
+}
+
+.btn-reset:hover {
+  color: var(--color-danger);
+}
+
+/* ---- 判定中画面 ---- */
+#screen-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.loading-icon {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-navy);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 16px;
+  color: var(--color-text-sub);
+  line-height: 1.6;
+}
+
+/* =============================================
+   結果ページ共通スタイル
+   ============================================= */
+
+.result-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.result-hero {
+  background: var(--color-navy);
+  color: #fff;
+  padding: 40px 16px 48px;
+  text-align: center;
+}
+
+.result-hero__eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.result-hero__type {
+  font-size: clamp(22px, 5vw, 30px);
+  font-weight: 800;
+  line-height: 1.3;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+.result-hero__catch {
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.85);
+  white-space: pre-line;
+}
+
+.result-body {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+/* 特徴カード */
+.result-card {
+  background: var(--color-card);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+.result-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-blue);
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.result-card__body {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--color-text);
+  white-space: pre-line;
+}
+
+/* 向いている人リスト */
+.suitable-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suitable-list li {
+  font-size: 15px;
+  color: var(--color-text);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.6;
+}
+
+.suitable-list li::before {
+  content: "✓";
+  color: var(--color-blue);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* PR表記 */
+.pr-notice {
+  background: var(--color-blue-light);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.pr-notice__short {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pr-notice__short span.pr-tag {
+  background: var(--color-text-sub);
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.pr-notice__detail {
+  font-size: 12px;
+  color: var(--color-text-sub);
+  line-height: 1.7;
+}
+
+/* CTAボタン */
+.cta-btn {
+  display: block;
+  width: 100%;
+  padding: 18px 24px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 3px 12px rgba(233, 146, 90, 0.35);
+  letter-spacing: 0.02em;
+  min-height: 56px;
+  line-height: 1.4;
+  font-family: var(--font-family);
+}
+
+.cta-btn:hover {
+  background: #d4793f;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 18px rgba(233, 146, 90, 0.45);
+  color: #fff;
+  opacity: 1;
+}
+
+.cta-btn:active {
+  transform: translateY(0);
+}
+
+/* A8広告スロット */
+.affiliate-slot {
+  margin-bottom: 8px;
+}
+
+.affiliate-placeholder {
+  background: var(--color-bg);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-sub);
+}
+
+/* サービス名・おすすめ理由 */
+.service-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-navy);
+  margin-bottom: 12px;
+}
+
+/* 今できることリスト（PREPARE用） */
+.todo-list {
+  list-style: none;
+  counter-reset: todo-counter;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 15px;
+  line-height: 1.6;
+  counter-increment: todo-counter;
+}
+
+.todo-list li::before {
+  content: counter(todo-counter);
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  background: var(--color-navy);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+/* 再診断・シェアエリア */
+.retry-share {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-retry {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  background: var(--color-card);
+  color: var(--color-navy);
+  font-size: 15px;
+  font-weight: 700;
+  border: 2px solid var(--color-navy);
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background var(--transition-fast);
+  min-height: 50px;
+  font-family: var(--font-family);
+}
+
+.btn-retry:hover {
+  background: var(--color-blue-light);
+  opacity: 1;
+}
+
+.btn-share {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 24px;
+  background: #000;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--transition-fast);
+  min-height: 50px;
+  font-family: var(--font-family);
+}
+
+.btn-share:hover {
+  background: #222;
+  color: #fff;
+  opacity: 1;
+}
+
+.btn-share__icon {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+/* 区切り線 */
+.divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 24px 0;
+}
+
+/* =============================================
+   法務ページ共通
+   ============================================= */
+
+.legal-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.legal-body {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 40px 16px 80px;
+}
+
+.legal-body h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-navy);
+  margin-bottom: 8px;
+}
+
+.legal-date {
+  font-size: 13px;
+  color: var(--color-text-sub);
+  margin-bottom: 32px;
+}
+
+.legal-section {
+  margin-bottom: 32px;
+}
+
+.legal-section h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-navy);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--color-blue-light);
+}
+
+.legal-section p,
+.legal-section li {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--color-text);
+}
+
+.legal-section ul,
+.legal-section ol {
+  padding-left: 20px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* =============================================
+   レスポンシブ
+   ============================================= */
+
+@media (min-width: 768px) {
+  #screen-start {
+    padding: 60px 24px 80px;
+  }
+
+  .start__character {
+    width: 160px;
+    height: 160px;
+  }
+
+  .start__title {
+    font-size: 36px;
+  }
+
+  .question-card__text {
+    font-size: 20px;
+  }
+
+  .result-hero {
+    padding: 56px 24px 64px;
+  }
+
+  .result-body {
+    padding: 40px 24px 80px;
+  }
+
+  .result-card {
+    padding: 28px 32px;
+  }
+
+  .retry-share {
+    flex-direction: row;
+  }
+
+  .btn-retry,
+  .btn-share {
+    flex: 1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .start__title {
+    font-size: 40px;
+  }
+}
+
+/* =============================================
+   affiliate-slot 内の広告リンクをCTA風に表示
+   A8広告コード自体は改変せず、外側CSSで見た目を制御する
+   ============================================= */
+
+/* 広告枠内のリンクをCTAボタン風に表示 */
+.affiliate-slot a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 14px 24px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  border-radius: var(--radius-btn);
+  text-decoration: none;
+  text-align: center;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  box-shadow: 0 3px 12px rgba(233, 146, 90, 0.35);
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  margin-bottom: 0;
+}
+
+.affiliate-slot a:hover {
+  background: #d4793f;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 18px rgba(233, 146, 90, 0.45);
+  color: #fff;
+  opacity: 1;
+}
+
+.affiliate-slot a:active {
+  transform: translateY(0);
+}
+
+/* 広告枠内の画像（バナー広告の場合）も整える */
+.affiliate-slot img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+/* =============================================
+   広告事前表示（紹介サービスの説明より前に表示する）
+   ============================================= */
+.ad-disclosure-top {
+  background: var(--color-blue-light);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  text-align: center;
+}
+
+/* 最新情報確認の注意書き */
+.update-notice {
+  font-size: 13px;
+  color: var(--color-text-sub);
+  text-align: center;
+  margin: 16px 0 24px;
+  line-height: 1.7;
+}
